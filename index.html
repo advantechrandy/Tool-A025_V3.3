@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>電池發熱瓦特數計算</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        :root {
+            --accent-color: #f59e0b;
+            --bg-dark: #0a0a0a;
+            --panel-bg: #171717;
+            --lcd-glow: rgba(245, 158, 11, 0.5);
+            --text-bright: #ffffff;
+            --text-muted: #a1a1aa;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 40px 40px;
+            color: var(--text-bright);
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono-font {
+            font-family: 'JetBrains+Mono', monospace;
+        }
+
+        .industrial-card {
+            background: var(--panel-bg);
+            border: 1px solid #333;
+            box-shadow: 20px 20px 60px #050505, -5px -5px 20px #1a1a1a;
+            padding: 40px;
+            position: relative;
+            border-radius: 4px;
+        }
+
+        h1 {
+            font-weight: 900;
+            letter-spacing: -0.05em;
+            background: linear-gradient(to bottom, #fff 50%, #d4d4d8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .input-field {
+            background: #0d0d0d;
+            border: 1px solid #444;
+            color: var(--accent-color);
+            font-family: 'JetBrains+Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 700;
+            padding: 14px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .input-field:focus {
+            border-color: var(--accent-color);
+            background: #111;
+            outline: none;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+        }
+
+        .label-text {
+            color: #d1d5db;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .label-text::before {
+            content: "";
+            width: 6px;
+            height: 6px;
+            background: var(--accent-color);
+            display: inline-block;
+        }
+
+        .result-panel {
+            background: #0a1124;
+            border: 1px solid #1e293b;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.6);
+        }
+
+        .lcd-text {
+            color: var(--accent-color);
+            font-family: 'Inter', sans-serif;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            text-shadow: 0 0 30px var(--lcd-glow);
+        }
+
+        .info-table {
+            width: 100%;
+            font-size: 0.8rem;
+            border-collapse: separate;
+            border-spacing: 0;
+            color: #e4e4e7;
+        }
+
+        .info-table th {
+            background: #262626;
+            color: #ffffff;
+            font-weight: 900;
+            text-transform: uppercase;
+            padding: 14px;
+            text-align: left;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .info-table td {
+            padding: 12px;
+            border-bottom: 1px solid #333;
+        }
+
+        .highlight-row {
+            background: rgba(245, 158, 11, 0.1);
+            color: #fff;
+        }
+
+        .concept-box {
+            background: #121212;
+            border: 1px solid #3f3f46;
+            border-left: 4px solid var(--accent-color);
+            padding: 18px;
+            height: 100%;
+        }
+
+        .warning-strip {
+            background: repeating-linear-gradient(
+                45deg,
+                var(--accent-color),
+                var(--accent-color) 15px,
+                #000 15px,
+                #000 30px
+            );
+            height: 14px;
+            width: 100%;
+            border-radius: 2px;
+        }
+
+        .value-unit {
+            font-size: 0.75rem;
+            color: #71717a;
+            font-weight: 900;
+            letter-spacing: 0.1em;
+        }
+    </style>
+    <!-- MathJax for rendering equations -->
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="p-6 md:p-16">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-12 flex justify-between items-center border-b border-zinc-700 pb-6">
+            <div>
+                <h1 class="text-5xl uppercase tracking-tighter">電池發熱瓦特數計算 V3.1</h1>
+                <div class="flex items-center gap-3 mt-2">
+                    <span class="bg-yellow-500 text-black px-2 py-0.5 text-[10px] font-black uppercase tracking-tighter">Precision Instrument</span>
+                    <p class="text-zinc-400 font-bold tracking-[0.3em] text-[10px] uppercase">Model B-2.9.5 / Thermal Calibrator</p>
+                </div>
+            </div>
+            <div class="text-right hidden md:block">
+                <div class="p-2 border border-zinc-700 rounded">
+                    <p class="text-[9px] text-zinc-400 mono-font leading-none">TERMINAL_SECURE_LINK</p>
+                    <p class="text-xs text-green-400 mono-font font-bold">● ONLINE</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="industrial-card">
+            <div class="mb-10">
+                <h2 class="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-white">
+                    電化學參數配置 <span class="text-zinc-400 font-medium text-sm">INPUT PARAMETERS</span>
+                </h2>
+                <div class="h-1.5 w-24 bg-yellow-500 mt-2"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-10 mb-10">
+                <div>
+                    <label class="label-text">連續工作電流 Current [I]</label>
+                    <div class="relative">
+                        <input type="number" id="bat_current" value="20" step="0.1" class="input-field w-full pr-12" oninput="calculate()">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 value-unit">AMP</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="label-text">直流等效內阻 Resistance [DCR]</label>
+                    <div class="relative">
+                        <input type="number" id="bat_resistance" value="50" step="1" class="input-field w-full pr-12" oninput="calculate()">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 value-unit">mΩ</span>
+                    </div>
+                </div>
+                <div>
+                    <label class="label-text">系統作業模式 Operation Mode</label>
+                    <select id="op_state" class="input-field w-full" onchange="calculate()">
+                        <option value="discharge">放電模式 (DISCHARGE)</option>
+                        <option value="charge">充電模式 (CHARGE)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="label-text">熵熱係數 Entropy Coeff [dE/dT]</label>
+                    <div class="relative">
+                        <input type="number" id="entropy_coeff" value="0.2" step="0.01" class="input-field w-full pr-16" oninput="calculate()">
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 value-unit">mV/K</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-12 bg-zinc-900 p-6 rounded-sm border border-zinc-700">
+                <div class="flex flex-col md:flex-row gap-6">
+                    <div class="flex-1">
+                        <label class="label-text">電芯核心溫度 (°Celsius)</label>
+                        <div class="relative">
+                            <input type="number" id="temp_c" value="25" step="1" class="input-field w-full pr-10" oninput="updateTempK()" placeholder="°C">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 value-unit opacity-50">°C</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center text-zinc-500 font-black text-[10px] tracking-widest px-4">
+                        <span class="hidden md:block">ABS_CONVERT</span>
+                        <span class="md:hidden">▼</span>
+                    </div>
+                    <div class="flex-1">
+                        <label class="label-text">熱力學絕對溫度 (Kelvin)</label>
+                        <div class="relative">
+                            <input type="number" id="temp_k" value="298.15" readonly class="input-field w-full pr-10 opacity-40 border-dashed" placeholder="K">
+                            <span class="absolute right-4 top-1/2 -translate-y-1/2 value-unit opacity-50">K</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="result-panel">
+                <div class="flex justify-between items-start mb-8">
+                    <div>
+                        <p class="label-text text-yellow-500 mb-2">焦耳產熱 (Joule Heat)</p>
+                        <p class="text-4xl font-black mono-font tracking-tighter text-white"><span id="joule_res">20.00</span> <span class="text-sm text-zinc-400 font-normal">W</span></p>
+                    </div>
+                    <div class="text-right">
+                        <p class="label-text text-yellow-500 mb-2">熵變熱 (Entropy Heat)</p>
+                        <p class="text-4xl font-black mono-font tracking-tighter text-white"><span id="chemical_res">1.19</span> <span class="text-sm text-zinc-400 font-normal">W</span></p>
+                    </div>
+                </div>
+
+                <div class="warning-strip mb-8 shadow-lg"></div>
+
+                <div class="py-4">
+                    <p class="label-text text-zinc-300 mb-2">電池總發熱瓦特數 Total Thermal Watts</p>
+                    <div class="flex items-baseline gap-6 mt-1">
+                        <span id="total_res" class="text-8xl lcd-text tracking-tighter">21.19</span>
+                        <span class="text-4xl font-black text-yellow-500 uppercase italic tracking-tighter">W</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-8 mt-10 border-t border-white/10 pt-8">
+                    <div class="text-center">
+                        <p class="text-[11px] text-zinc-400 uppercase font-black tracking-[0.2em] mb-2">Thermal Units (BTU/hr)</p>
+                        <p id="total_btu" class="text-3xl font-bold text-white mono-font">72.30</p>
+                    </div>
+                    <div class="text-center border-l border-white/10">
+                        <p class="text-[11px] text-zinc-400 uppercase font-black tracking-[0.2em] mb-2">Heat Flux (Cal/sec)</p>
+                        <p id="total_cal" class="text-3xl font-bold text-white mono-font">5.06</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-16 space-y-12">
+                <section>
+                    <h3 class="label-text text-yellow-500 text-[12px] mb-6">關鍵技術概念說明 Tech Definitions</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="concept-box">
+                            <p class="text-xs font-black text-white mb-2 uppercase tracking-tighter">DCIR (直流內阻)</p>
+                            <p class="text-[10px] text-zinc-300 leading-relaxed font-medium">
+                                代表真實焦耳損耗。建議使用 10s 脈衝數據，這能反映真實負載下的壓降損耗。
+                            </p>
+                        </div>
+                        <div class="concept-box">
+                            <p class="text-xs font-black text-white mb-2 uppercase tracking-tighter">SOH (健康狀態)</p>
+                            <p class="text-[10px] text-zinc-300 leading-relaxed font-medium">
+                                隨循環增加，內阻會上升。當內阻翻倍時，發熱量在同電流下也會隨之翻倍。
+                            </p>
+                        </div>
+                        <div class="concept-box">
+                            <p class="text-xs font-black text-white mb-2 uppercase tracking-tighter">吸熱與放熱效應</p>
+                            <p class="text-[10px] text-zinc-300 leading-relaxed font-medium text-yellow-500/90">
+                                <b>注意：</b>若放電發熱劇烈，請嘗試將 dE/dT 設為 <b>負值</b>。正負號決定了化學反應在該 SOC 是吸熱或放熱。
+                            </p>
+                        </div>
+                        <div class="concept-box">
+                            <p class="text-xs font-black text-white mb-2 uppercase tracking-tighter">熵熱係數 (dE/dT)</p>
+                            <p class="text-[10px] text-zinc-300 leading-relaxed font-medium">
+                                典型參考值：<span class="text-yellow-500 font-bold">0.1 ~ 0.3 mV/K</span>。數值隨 SOC 變化，在高電量與低電量時可能反轉正負號。
+                            </p>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <h3 class="label-text text-yellow-500 text-[12px] mb-6">工程手冊: 散熱設計餘量建議</h3>
+                    <div class="overflow-hidden border border-zinc-700 rounded-sm shadow-2xl">
+                        <table class="info-table">
+                            <thead>
+                                <tr>
+                                    <th>應用環境類別</th>
+                                    <th>典型倍率</th>
+                                    <th>熱預算建議 (占輸出 %)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="font-bold text-white">大型儲能 (ESS)</td>
+                                    <td class="mono-font">&lt; 0.5C</td>
+                                    <td>1.0% — 2.5%</td>
+                                </tr>
+                                <tr class="highlight-row">
+                                    <td class="font-black text-yellow-400">工業平板電腦 (Tablet)</td>
+                                    <td class="mono-font text-yellow-400 font-bold">0.5C — 1.5C</td>
+                                    <td class="text-yellow-400 font-bold">2.0% — 4.5%</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-white">動力系統 (EV/AGV)</td>
+                                    <td class="mono-font">1.0C — 3.0C</td>
+                                    <td>3.0% — 7.5%</td>
+                                </tr>
+                                <tr>
+                                    <td class="font-bold text-white">高功率載具 (UAV)</td>
+                                    <td class="mono-font">&gt; 10C</td>
+                                    <td>&gt; 10.0%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-6 space-y-4">
+                        <div class="text-[10px] text-zinc-300 leading-relaxed font-bold italic border-l-4 border-yellow-600 pl-4 bg-zinc-900/50 py-3">
+                            <p class="mb-1 text-yellow-300 uppercase tracking-widest">工程筆記 (I)：實務DCR量測建議</p>
+                            <p>建議使用「脈衝放電法」自行量測。例如：給予電池一個 1C / 10s的電流脈衝，量測平均電壓降 (\(\Delta V\))，則 \(DCR = \Delta V / I\) ，這個數值才真正代表電流通過時產生的焦耳熱。</p>
+                        </div>
+                        <div class="text-[10px] text-zinc-300 leading-relaxed font-medium border-l-4 border-zinc-500 pl-4 bg-zinc-900/50 py-3">
+                            <p class="font-black text-white mb-2 underline tracking-widest">工程筆記 (II)：電池產熱熱力學</p>
+                            <p class="mb-2">電池的總發熱由兩部分組成：</p>
+                            <ul class="list-disc ml-4 space-y-2">
+                                <li><b>焦耳熱 (Joule Heat, \(I^2 R\))：</b>永遠為正值，無論充放電皆持續產熱。</li>
+                                <li><b>熵變熱 (Entropy Heat, \(-I \cdot T \cdot \frac{dE}{dT}\))：</b>會隨電流方向（充或放）改變正負號。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="mt-16 pt-8 border-t border-zinc-700 text-[10px] text-zinc-500 mono-font uppercase tracking-widest flex justify-between">
+                <div class="text-zinc-400 font-bold">Q_total = (I² * R) + (-I * T * dE/dT)</div>
+                <div class="text-zinc-500">Core Engine: Bernardi Thermal Equation</div>
+            </div>
+        </div>
+
+        <footer class="mt-8 flex justify-between items-center text-zinc-600 text-[10px] font-black tracking-widest uppercase">
+            <span>CREATED BY KEN HUNG & RANDY CHEN</span>
+            <span>Ref: Electrochimica Acta 30.12 / Thermophysics</span>
+        </footer>
+    </div>
+
+    <script>
+        // 阻擋使用者右鍵選單
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        }, false);
+
+        function updateTempK() {
+            const c = parseFloat(document.getElementById('temp_c').value) || 0;
+            document.getElementById('temp_k').value = (c + 273.15).toFixed(2);
+            calculate();
+        }
+
+        function calculate() {
+            const I = parseFloat(document.getElementById('bat_current').value) || 0;
+            const R_mOhm = parseFloat(document.getElementById('bat_resistance').value) || 0;
+            const state = document.getElementById('op_state').value;
+            const dEocdT_mV = parseFloat(document.getElementById('entropy_coeff').value) || 0;
+            const T_K = parseFloat(document.getElementById('temp_k').value) || 298.15;
+
+            const R_Ohm = R_mOhm / 1000;
+            const dEocdT = dEocdT_mV / 1000; 
+
+            const P_joule = I * I * R_Ohm;
+            let currentSign = (state === 'discharge') ? 1 : -1;
+            const P_chemical = -1 * (currentSign * I) * T_K * dEocdT;
+            const P_total = P_joule + P_chemical;
+
+            document.getElementById('joule_res').innerText = P_joule.toFixed(2);
+            document.getElementById('chemical_res').innerText = P_chemical.toFixed(2);
+            document.getElementById('total_res').innerText = Math.max(0, P_total).toFixed(2);
+            
+            const finalWatts = Math.max(0, P_total);
+            document.getElementById('total_btu').innerText = (finalWatts * 3.4121).toFixed(2);
+            document.getElementById('total_cal').innerText = (finalWatts * 0.2390).toFixed(2);
+        }
+
+        window.onload = function() {
+            calculate();
+            // Trigger MathJax typeset after load
+            if (window.MathJax) {
+                window.MathJax.typesetPromise();
+            }
+        };
+    </script>
+</body>
+</html>
